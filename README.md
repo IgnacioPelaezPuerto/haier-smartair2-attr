@@ -96,7 +96,6 @@ secundario.
 
 ## Verificación en un Haier real
 
-Probado contra un split Haier (device id `D32C…`, `eProtocolVer 2.18`, cuenta
-de región Europa): lectura completa de estado, encendido/apagado, cambio de
+Probado contra un split Haier (`eProtocolVer 2.18`, cuenta de región Europa): lectura completa de estado, encendido/apagado, cambio de
 temperatura objetivo 30 → 24 °C confirmado en el display del aparato, y cambio
 de velocidad. Todos con `errNo: 0`.

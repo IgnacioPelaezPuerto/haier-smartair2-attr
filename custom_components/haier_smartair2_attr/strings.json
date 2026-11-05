@@ -29,32 +29,5 @@
       }
     }
   },
-  "entity": {
-    "climate": {
-      "haier_smartair2": {
-        "state_attributes": {
-          "fan_mode": {
-            "state": {
-              "quiet": "Silencioso",
-              "low": "Baja",
-              "medium": "Media",
-              "high": "Alta",
-              "auto": "Auto"
-            }
-          }
-        }
-      }
-    },
-    "sensor": {
-      "current_temperature": {
-        "name": "Temperatura interior"
-      },
-      "outdoor_temperature": {
-        "name": "Temperatura exterior"
-      },
-      "humidity": {
-        "name": "Humedad interior"
-      }
-    }
-  }
+  "title": "Haier SmartAir2 (API de atributos)"
 }
