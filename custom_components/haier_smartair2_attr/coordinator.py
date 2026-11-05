@@ -5,9 +5,11 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from homeassistant.config_entries import ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import HaierCloudApi, HaierCloudError

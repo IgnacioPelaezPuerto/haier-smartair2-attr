@@ -73,7 +73,7 @@ class HaierCloudClimate(CoordinatorEntity, ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 16.0
     _attr_max_temp = 30.0
-    _attr_target_temp_step = 1.0
+    _attr_target_temperature_step = 1.0
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.COOL,
                         HVACMode.DRY, HVACMode.HEAT, HVACMode.FAN_ONLY]
     _attr_fan_modes = list(FAN_TO_SPEED)

@@ -1,0 +1,33 @@
+{
+  "title": "Haier SmartAir2 (Attribute API)",
+  "config": {
+    "abort": {
+      "already_configured": "This Haier device is already configured.",
+      "no_devices": "The Haier account has no compatible devices."
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the Haier cloud. Check the region and the Internet connection.",
+      "device_not_found": "The device no longer appears in the account.",
+      "invalid_auth": "Wrong email or password for the selected region.",
+      "unknown": "Unexpected failure while connecting to Haier."
+    },
+    "step": {
+      "device": {
+        "data": {
+          "device_id": "Device"
+        },
+        "description": "The account has several devices. Choose the split you want to control in Home Assistant.",
+        "title": "Select the device"
+      },
+      "user": {
+        "data": {
+          "email": "Haier account email",
+          "password": "Password",
+          "region": "Account region"
+        },
+        "description": "These are the credentials of your SmartAir2 / Smart Clima app.\n\nWarning: signing in here invalidates the mobile session in the Haier cloud. To keep using the app, create a second Haier account and share the device with it.",
+        "title": "Haier account"
+      }
+    }
+  }
+}

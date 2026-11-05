@@ -54,7 +54,7 @@ class HaierConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 if not devices:
                     return self.abort(reason="no_devices", description_placeholders={})
-                await self._async_set_unique_id(str(devices[0]["id"]).upper())
+                await self.async_set_unique_id(str(devices[0]["id"]).upper())
                 self._abort_if_unique_id_configured()
                 self._data = {
                     CONF_EMAIL: email,
@@ -110,7 +110,7 @@ class HaierConfigFlow(ConfigFlow, domain=DOMAIN):
             if chosen is None:
                 errors[CONF_DEVICE_ID] = "device_not_found"
             else:
-                await self._async_set_unique_id(dev_id)
+                await self.async_set_unique_id(dev_id)
                 self._abort_if_unique_id_configured()
                 return self._create(chosen)
 
