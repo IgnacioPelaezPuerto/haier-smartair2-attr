@@ -83,4 +83,4 @@ NUMERIC_ATTRS: frozenset[str] = frozenset(
 # --- temporizacion ---
 DEFAULT_SCAN_INTERVAL = 60          # refresco periodico de estado
 TOKEN_REFRESH = 12 * 3600           # el token de Haier aguanta mucho; re-negar solo si falla
-RESPONSE_TIMEOUT = 10.0             # espera maxima por Resp/Op
+RESPONSE_TIMEOUT = 15.0             # espera maxima por Resp/Op

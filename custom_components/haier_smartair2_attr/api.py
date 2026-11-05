@@ -121,6 +121,7 @@ class HaierCloudApi:
         self._lock = threading.Lock()
         self._pending: dict[str, threading.Event] = {}
         self._last_resp: dict | None = None
+        self._sn = 100
 
         self.device_id: str | None = None
         self.device_name: str | None = None
@@ -297,6 +298,7 @@ class HaierCloudApi:
         self._connected.set()
 
     def _on_message(self, _client, _userdata, message) -> None:
+        self._log.debug("RECV %s %s", message.topic, bytes(message.payload)[:300])
         try:
             packet = json.loads(message.payload)
         except (ValueError, TypeError):
@@ -401,6 +403,17 @@ class HaierCloudApi:
         if not self._client:
             raise HaierCloudError("sin conexion MQTT (llama a start() primero)")
         self._log.info("Haier: renegando la sesion de usuario")
+        self._renew_session()
+
+    def _renew_session(self) -> None:
+        """Re-login y re-suscripcion sobre la misma conexion MQTT.
+
+        Hace falta cuando la nube deja de enrutar en silencio: el CONNACK sigue
+        vivo pero ya no llega ningun mensaje, y sin esto la integracion se
+        queda obsoleta para siempre sin avisar.
+        """
+        if not self._client:
+            raise HaierCloudError("sin conexion MQTT (llama a start() primero)")
         self.login()
         self._connected.clear()
         self._on_connect(self._client, None, None, 0)
@@ -408,25 +421,51 @@ class HaierCloudApi:
             raise HaierCloudError("no se pudo re-suscribir a los topicos de Haier")
         time.sleep(0.5)   # la nube necesita un momento para registrar la suscripcion
 
-    def _request(self, op: str, args: list) -> dict:
-        self._ensure_session()
-        if not self._client:
-            raise HaierCloudError("sin conexion MQTT")
-        sn = str(int(time.time()) % 100000 + secrets.randbelow(1000))
-        event = threading.Event()
-        self._pending[sn] = event
-        self._last_resp = None
-        self._client.publish(
-            f"User/{self._token}/{TOPIC_REQ_OP.format(devid=self.device_id)}",
-            json.dumps({"sn": sn, "op": op, "args": args}),
-        )
-        if not event.wait(RESPONSE_TIMEOUT):
+    def _next_sn(self) -> str:
+        """Numero de peticion, como los de la app ('101', '102', ...)."""
+        with self._lock:
+            self._sn = (self._sn + 1) % 9000 + 100
+            return str(self._sn)
+
+    def _request(self, op: str, args: list, attempts: int = 2) -> dict:
+        """Peticion de operacion con un reintento tras renovar la sesion.
+
+        El primer fallo suele ser una sesion que la nube ya no enruta (se
+        llevo el token otro dispositivo o el broker corto el streaming).  Con
+        volver a hacer login y re-suscribir los topicos la segunda intentona
+        pasa casi siempre.
+        """
+        last_err: HaierCloudError | None = None
+        for attempt in range(1, attempts + 1):
+            self._ensure_session()
+            sn = self._next_sn()
+            event = threading.Event()
+            self._pending[sn] = event
+            self._last_resp = None
+            topic = f"User/{self._token}/{TOPIC_REQ_OP.format(devid=self.device_id)}"
+            payload = json.dumps({"sn": sn, "op": op, "args": args})
+            self._log.debug("PUB %s %s", topic, payload[:500])
+            self._client.publish(topic, payload)
+
+            if event.wait(RESPONSE_TIMEOUT):
+                self._pending.pop(sn, None)
+                resp = self._last_resp or {}
+                if resp.get("errNo"):
+                    raise HaierCloudError(
+                        f"{op}: el aparato rechazo la orden (errNo={resp.get('errNo')})"
+                    )
+                return resp
+
             self._pending.pop(sn, None)
-            raise HaierCloudError(f"{op}: el aparato no respondio en {RESPONSE_TIMEOUT:.0f} s")
-        resp = self._last_resp or {}
-        if resp.get("errNo"):
-            raise HaierCloudError(f"{op}: errNo={resp.get('errNo')}")
-        return resp
+            last_err = HaierCloudError(
+                f"{op}: la nube de Haier no contesto en {RESPONSE_TIMEOUT:.0f} s"
+            )
+            if attempt < attempts:
+                self._log.warning("%s; renuevo la sesion y reintento", last_err)
+                self._renew_session()
+
+        assert last_err is not None
+        raise last_err
 
     def read_all(self) -> dict:
         """Pide el estado completo (getAllProperty)."""

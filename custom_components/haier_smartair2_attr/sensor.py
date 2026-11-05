@@ -31,8 +31,8 @@ async def async_setup_entry(
                                "Temp. interior", SensorDeviceClass.TEMPERATURE),
         HaierTemperatureSensor(coord, ATTR_OUTDOOR_TEMP, "outdoor_temperature",
                                "Temp. exterior", SensorDeviceClass.TEMPERATURE),
-        HaierTemperatureSensor(coord, ATTR_ROOM_HUMIDITY, "humidity",
-                               "Humedad interior", SensorDeviceClass.HUMIDITY),
+        HaierHumiditySensor(coord, ATTR_ROOM_HUMIDITY, "humidity",
+                            "Humedad interior", SensorDeviceClass.HUMIDITY),
     ], True)
 
 
@@ -62,7 +62,24 @@ class HaierTemperatureSensor(HaierSensor, SensorEntity):
         super().__init__(coord, attr, key, name)
         self._attr_device_class = device_class
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        if device_class == SensorDeviceClass.HUMIDITY:
-            self._attr_native_unit_of_measurement = PERCENTAGE
-        else:
-            self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+
+
+class HaierHumiditySensor(HaierSensor, SensorEntity):
+    """Humedad de sala.  Muchos splits no la miden y mandan 0.
+
+    Un 0% en un salon es casi imposible, y el aparato lo que hace realmente es
+    reportar 'no tengo este sensor'.  Lo convertimos en estado desconocido para
+    no llenar el historial de ceros falsos.
+    """
+
+    def __init__(self, coord, attr, key, name, device_class) -> None:
+        super().__init__(coord, attr, key, name)
+        self._attr_device_class = device_class
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_native_unit_of_measurement = PERCENTAGE
+
+    @property
+    def native_value(self):
+        value = super().native_value
+        return None if not value else value
