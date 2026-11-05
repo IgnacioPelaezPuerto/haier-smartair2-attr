@@ -1,0 +1,11 @@
+{
+  "name": "Haier SmartAir2 (Attribute API)",
+  "content_excludes": [
+    "/.git*",
+    "/README.md",
+    "/.github",
+    "/tools"
+  ],
+  "homeassistant": "2024.10.0",
+  "render_readme": true
+}

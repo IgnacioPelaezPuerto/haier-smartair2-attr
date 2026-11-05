@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.idea/
+.vscode/
+
+# credenciales locales: nunca al repositorio
+credenciales*.txt
+*.local.txt
+.env

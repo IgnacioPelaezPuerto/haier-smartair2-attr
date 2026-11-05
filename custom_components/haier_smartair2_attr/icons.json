@@ -1,0 +1,15 @@
+{
+  "entity": {
+    "sensor": {
+      "current_temperature": {
+        "icon": "mdi:thermometer"
+      },
+      "outdoor_temperature": {
+        "icon": "mdi:thermometer-outdoor"
+      },
+      "humidity": {
+        "icon": "mdi:water-percent"
+      }
+    }
+  }
+}
