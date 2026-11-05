@@ -92,8 +92,14 @@ class HaierConfigFlow(ConfigFlow, domain=DOMAIN):
         """Elige aparato cuando la cuenta tiene mas de uno."""
         errors: dict[str, str] = {}
         options = [
-            SelectOptionDict(value=str(dev["id"]).upper(),
-                             label=str(dev.get("name") or dev["id"]))
+            SelectOptionDict(
+                value=str(dev["id"]).upper(),
+                label="{name}{sala}{apagado}".format(
+                    name=str(dev.get("name") or dev["id"]),
+                    sala=f"  ·  {dev['room']}" if dev.get("room") else "",
+                    apagado="" if dev.get("online") else "  (apagado)",
+                ),
+            )
             for dev in self._devices
         ]
 

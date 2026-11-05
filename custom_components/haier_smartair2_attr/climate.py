@@ -94,7 +94,8 @@ class HaierCloudClimate(CoordinatorEntity, ClimateEntity):
             "identifiers": {(DOMAIN, coord.api.device_id)},
             "name": coord.api.device_name or "Aire Acondicionado",
             "manufacturer": "Haier",
-            "model": "SmartAir2 (nube)",
+            "model": f"SmartAir2 (nube, EPP {coord.api.device_protocol or '?'})",
+            "serial_number": coord.api.device_id,
         }
 
     # ------------------------------------------------------------------ estado

@@ -124,6 +124,7 @@ class HaierCloudApi:
 
         self.device_id: str | None = None
         self.device_name: str | None = None
+        self.device_protocol: str | None = None
         self.state: dict[str, str] = {}
         # puesto por el coordinador para avisar de que llego estado nuevo
         self.on_state_updated = None        # callable() -> None
@@ -132,6 +133,22 @@ class HaierCloudApi:
     # --------------------------------------------------------------- REST
 
     def _post(self, path: str, body: dict, token: str | None = None) -> dict:
+        """POST con reintentos: el borde de Haier tira timeouts a menudo.
+
+        Sin esto, un solo paquete perdido al arrancar deja la integracion en
+        `ConfigEntryNotReady` y hay que esperar al siguiente ciclo.
+        """
+        last_err: Exception | None = None
+        for attempt in range(3):
+            try:
+                return self._post_once(path, body, token)
+            except (urllib.error.URLError, TimeoutError, ConnectionResetError, OSError) as err:
+                last_err = err
+                self._log.debug("Haier REST %s intento %d: %s", path, attempt + 1, err)
+                time.sleep(2.0 * (attempt + 1))
+        raise HaierCloudError(f"{path} no respondio ({last_err})")
+
+    def _post_once(self, path: str, body: dict, token: str | None = None) -> dict:
         headers = {
             "appKey": APP_KEY,
             "appId": APP_ID,
@@ -167,18 +184,42 @@ class HaierCloudApi:
         self._token = token
         return token
 
-    def list_devices(self) -> list[dict]:
+    def list_devices(self, ac_only: bool = True) -> list[dict]:
+        """Aparatos de la cuenta, normalizados.
+
+        La respuesta real de `get_userDevlist` trae el aparato dentro de
+        cityListResult -> roomDeviceResultList -> deviceList, con claves como:
+
+            id, name, status.online, type.typeIdentifier,
+            version.eProtocolVer, version.smartlink.smartLinkPlatform
+
+        `smartLinkPlatform` vale 'UHOME_OVERSEAS_AC' en los splits: es lo unico
+        que permite distinguir un aire de una lavadora de la misma cuenta.
+        """
         if not self._token:
             self.login()
         data = self._post(PATH_DEVLIST, {
             "get_devlist_info": {"sctx": {"appId": APP_ID, "appVersion": APP_VERSION,
                                           "clientId": REST_CLIENT_ID}}
         }, self._token)
-        devs: list[dict] = []
+        out: list[dict] = []
         for city in data.get("cityListResult") or []:
             for room in city.get("roomDeviceResultList") or []:
-                devs.extend(room.get("deviceList") or [])
-        return devs
+                for dev in room.get("deviceList") or []:
+                    version = dev.get("version") or {}
+                    smartlink = version.get("smartlink") or {}
+                    platform = smartlink.get("smartLinkPlatform") or ""
+                    if ac_only and platform and "AC" not in platform.upper():
+                        continue
+                    out.append({
+                        "id": dev.get("id"),
+                        "name": dev.get("name"),
+                        "online": bool((dev.get("status") or {}).get("online")),
+                        "platform": platform,
+                        "protocol": version.get("eProtocolVer"),
+                        "room": room.get("name"),
+                    })
+        return out
 
     # ------------------------------------------------------------ master-gw
 
@@ -298,12 +339,16 @@ class HaierCloudApi:
 
         if not self._token:
             self.login()
-        if not self.device_id:
-            devs = self.list_devices()
-            if not devs:
-                raise HaierCloudError("la cuenta de Haier no tiene aparatos")
-            self.device_id = str(devs[0]["id"]).upper()
-            self.device_name = devs[0].get("name") or self.device_id
+        devs = self.list_devices()
+        if not devs:
+            raise HaierCloudError("la cuenta de Haier no tiene aparatos compatibles")
+        chosen = next((d for d in devs if str(d["id"]).upper() == (self.device_id or "").upper()),
+                      devs[0])
+        self.device_id = str(chosen["id"]).upper()
+        self.device_name = chosen.get("name") or self.device_id
+        self.device_protocol = chosen.get("protocol")
+        if not chosen.get("online"):
+            self._log.warning("Haier: el aparato %s figura como desconectado", self.device_id)
 
         host, port = self._mqtt_endpoint()
         client = mqtt.Client(
