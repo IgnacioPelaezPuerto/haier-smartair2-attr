@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 DOMAIN = "haier_smartair2_attr"
-PLATFORMS = ["climate", "sensor"]
+PLATFORMS = ["binary_sensor", "climate", "sensor"]
 
 CONF_REGION = "region"
-CONF_DEVICE_ID = "device_id"
-CONF_DEVICE_NAME = "device_name"
 CONF_DEVICE_ID = "device_id"
 CONF_DEVICE_NAME = "device_name"
 
@@ -84,3 +82,25 @@ NUMERIC_ATTRS: frozenset[str] = frozenset(
 DEFAULT_SCAN_INTERVAL = 60          # refresco periodico de estado
 TOKEN_REFRESH = 12 * 3600           # el token de Haier aguanta mucho; re-negar solo si falla
 RESPONSE_TIMEOUT = 15.0             # espera maxima por Resp/Op
+
+# --- codigos errNo observados en la nube de Haier ---
+# Los traducimos porque son lo unico que ve el usuario cuando algo va mal, y
+# "errNo=16" no dice nada.  Solo traduco los que hemos visto confirmados por la
+# propia lista de aparatos (16 coincide con online=False); el resto se pasa tal
+# cual para no inventar significados.
+ERRNO_DEVICE_OFFLINE = 16
+ERRNO_LABELS: dict[int, str] = {
+    ERRNO_DEVICE_OFFLINE: "el split esta desconectado de la nube de Haier "
+                          "(revisa alimentacion y WiFi del aparato)",
+}
+
+
+def errno_message(op: str, err_no) -> str:
+    """Frase legible para un errNo de la nube."""
+    try:
+        code = int(err_no)
+    except (TypeError, ValueError):
+        code = -1
+    label = ERRNO_LABELS.get(code, f"la nube de Haier rechazo la orden (errNo={err_no})")
+    return f"{op}: {label}"
+

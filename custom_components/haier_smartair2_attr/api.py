@@ -42,6 +42,7 @@ from .const import (
     APP_KEY,
     APP_VERSION,
     AUTH_SALT,
+    ERRNO_DEVICE_OFFLINE,
     LOGIN_HOST,
     LOGIN_PORT,
     MASTER_GW_PORT,
@@ -59,11 +60,21 @@ from .const import (
     TOPIC_RESP_OP,
     WRITABLE_ATTRS,
     NUMERIC_ATTRS,
+    errno_message,
 )
 
 
 class HaierCloudError(Exception):
     """Fallo de comunicacion con la nube de Haier."""
+
+
+class HaierDeviceOffline(HaierCloudError):
+    """La nube contesta, pero avisa de que el split no esta en linea (errNo 16).
+
+    No es un problema de credenciales ni de Home Assistant: el aparato no
+    tiene red.  Se separa para poder informar bien y para no reintentar ordenes
+    contra un aparato que esta apagado o sin WiFi.
+    """
 
 
 def _insecure_ctx() -> ssl.SSLContext:
@@ -126,6 +137,7 @@ class HaierCloudApi:
         self.device_id: str | None = None
         self.device_name: str | None = None
         self.device_protocol: str | None = None
+        self.device_online: bool | None = None   # None = todavia sin datos
         self.state: dict[str, str] = {}
         # puesto por el coordinador para avisar de que llego estado nuevo
         self.on_state_updated = None        # callable() -> None
@@ -313,6 +325,7 @@ class HaierCloudApi:
 
         sn = str(packet.get("sn") or "")
         if "attrs" in packet:                       # Push/Dev/Attr
+            self.device_online = True
             self.state.update(_flatten(packet["attrs"]))
             if self.on_state_updated:
                 self.on_state_updated()
@@ -349,6 +362,7 @@ class HaierCloudApi:
         self.device_id = str(chosen["id"]).upper()
         self.device_name = chosen.get("name") or self.device_id
         self.device_protocol = chosen.get("protocol")
+        self.device_online = bool(chosen.get("online"))
         if not chosen.get("online"):
             self._log.warning("Haier: el aparato %s figura como desconectado", self.device_id)
 
@@ -450,10 +464,15 @@ class HaierCloudApi:
             if event.wait(RESPONSE_TIMEOUT):
                 self._pending.pop(sn, None)
                 resp = self._last_resp or {}
-                if resp.get("errNo"):
-                    raise HaierCloudError(
-                        f"{op}: el aparato rechazo la orden (errNo={resp.get('errNo')})"
-                    )
+                err_no = resp.get("errNo")
+                if err_no:
+                    if int(err_no) == ERRNO_DEVICE_OFFLINE:
+                        # reintentar contra un aparato apagado solo alarga el
+                        # aviso; lo subimos directamente a Home Assistant
+                        self.device_online = False
+                        raise HaierDeviceOffline(errno_message(op, err_no))
+                    raise HaierCloudError(errno_message(op, err_no))
+                self.device_online = True
                 return resp
 
             self._pending.pop(sn, None)

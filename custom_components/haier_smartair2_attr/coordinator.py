@@ -12,7 +12,7 @@ from homeassistant.exceptions import (
 )
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import HaierCloudApi, HaierCloudError
+from .api import HaierCloudApi, HaierCloudError, HaierDeviceOffline
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +60,11 @@ class HaierCoordinator(DataUpdateCoordinator):
     async def _async_update(self) -> dict:
         try:
             state = await self.hass.async_add_executor_job(self.api.read_all)
+        except HaierDeviceOffline as err:
+            # el split perdio la red: no es un problema de credenciales, y hay
+            # que decirlo claro porque el aparato sigue funcionando con el mando
+            self.available = False
+            raise UpdateFailed(str(err)) from err
         except HaierCloudError as err:
             self.available = False
             if "login" in str(err).lower():
