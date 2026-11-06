@@ -8,7 +8,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from .api import HaierCloudApi, HaierCloudError
+from .api import HaierCloudApi, HaierCloudError, HaierDeviceOffline
 from .const import CONF_DEVICE_ID, CONF_DEVICE_NAME, CONF_REGION, DOMAIN, PLATFORMS
 from .coordinator import HaierCoordinator
 
@@ -31,22 +31,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaierConfigEntry) -> boo
     coordinator = HaierCoordinator(hass, api)
 
     try:
-        # login + master-gw + MQTT + primera lectura, todo en executor
+        # login + master-gw + MQTT (el aparato aun no hace falta)
         await hass.async_add_executor_job(api.start)
-        await hass.async_add_executor_job(api.read_all)
     except HaierCloudError as err:
         api.stop()
         text = str(err).lower()
-        if "login" in text or "token" in text or "reject" in text:
+        if "login" in text or "token" in text:
             raise ConfigEntryAuthFailed(str(err)) from err
         raise ConfigEntryNotReady(str(err)) from err
     except Exception as err:  # noqa: BLE001 - paho/ssl/urllib lanzan de todo
         api.stop()
         raise ConfigEntryNotReady(f"no se pudo hablar con la nube de Haier: {err}") from err
 
-    if not api.state:
+    try:
+        await hass.async_add_executor_job(api.read_all)
+    except HaierDeviceOffline as err:
+        # La sesion de nube es buena, solo falta el split.  Montamos igualmente
+        # para que el usuario vea el aparato y el sensor de conectividad: si
+        # abortasemos aqui, Home Assistant no crearia entidades y la
+        # integracion pareceria muerta aunque funcione.
+        _LOGGER.warning("Haier: el aparato esta sin red al arrancar (%s); las "
+                        "entidades se llenaran cuando vuelva", err)
+    except HaierCloudError as err:
         api.stop()
-        raise ConfigEntryNotReady("la cuenta de Haier no devolvio ningun aparato")
+        raise ConfigEntryNotReady(str(err)) from err
 
     coordinator.data = dict(api.state)
     coordinator.available = True
