@@ -70,7 +70,7 @@ async def async_setup_entry(
 class HaierCloudClimate(CoordinatorEntity, ClimateEntity):
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 16.0
     _attr_max_temp = 30.0
     _attr_target_temperature_step = 1.0
@@ -112,11 +112,11 @@ class HaierCloudClimate(CoordinatorEntity, ClimateEntity):
         return MODE_TO_HVAC.get(str(data.get(ATTR_MODE)), HVACMode.AUTO)
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         return _num((self.coordinator.data or {}).get(ATTR_TARGET_TEMP))
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         return _num((self.coordinator.data or {}).get(ATTR_ROOM_TEMP))
 
     @property
